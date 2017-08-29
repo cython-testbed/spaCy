@@ -19,7 +19,7 @@ env:
 
 install:
   - "./travis.sh"
-  - pip install --install-option="--no-cython-compile" https://github.com/cython/cython/archive/release.zip
+  - pip install --install-option="--no-cython-compile" https://github.com/cython/cython/archive/557fd54ae9308a087993ebc66be0c58bf7f33040.zip
 
 script:
   - "pip install pytest pytest-timeout"
