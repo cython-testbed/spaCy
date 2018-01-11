@@ -7,7 +7,7 @@ if __name__ == '__main__':
     import plac
     import sys
     from spacy.cli import download, link, info, package, train, convert
-    from spacy.cli import vocab, profile, evaluate, validate
+    from spacy.cli import vocab, init_model, profile, evaluate, validate
     from spacy.util import prints
 
     commands = {
@@ -19,6 +19,7 @@ if __name__ == '__main__':
         'convert': convert,
         'package': package,
         'vocab': vocab,
+        'init-model': init_model,
         'profile': profile,
         'validate': validate
     }
@@ -27,7 +28,7 @@ if __name__ == '__main__':
     command = sys.argv.pop(1)
     sys.argv[0] = 'spacy %s' % command
     if command in commands:
-        plac.call(commands[command])
+        plac.call(commands[command], sys.argv[1:])
     else:
         prints(
             "Available: %s" % ', '.join(commands),

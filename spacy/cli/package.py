@@ -20,7 +20,7 @@ from .. import about
                  "the command line prompt", "flag", "c", bool),
     force=("force overwriting of existing model directory in output directory",
            "flag", "f", bool))
-def package(cmd, input_dir, output_dir, meta_path=None, create_meta=False,
+def package(input_dir, output_dir, meta_path=None, create_meta=False,
             force=False):
     """
     Generate Python package for model data, including meta and required
@@ -146,7 +146,7 @@ def list_files(data_dir):
 
 def list_requirements(meta):
     parent_package = meta.get('parent_package', 'spacy')
-    requirements = [parent_package + meta['spacy_version']]
+    requirements = [parent_package + ">=" + meta['spacy_version']]
     if 'setup_requires' in meta:
         requirements += meta['setup_requires']
     return requirements

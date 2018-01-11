@@ -1,4 +1,5 @@
 # coding: utf8
+# cython: profile=True
 from __future__ import unicode_literals
 
 import numpy
@@ -154,7 +155,10 @@ cdef class Vocab:
         lex = <LexemeC*>mem.alloc(sizeof(LexemeC), 1)
         lex.orth = self.strings.add(string)
         lex.length = len(string)
-        lex.id = self.length
+        if self.vectors is not None:
+            lex.id = self.vectors.key2row.get(lex.orth, 0)
+        else:
+            lex.id = 0
         if self.lex_attr_getters is not None:
             for attr, func in self.lex_attr_getters.items():
                 value = func(string)
@@ -164,9 +168,7 @@ cdef class Vocab:
                     lex.prob = value
                 elif value is not None:
                     Lexeme.set_struct_attr(lex, attr, value)
-        if is_oov:
-            lex.id = 0
-        else:
+        if not is_oov:
             key = hash_string(string)
             self._add_lex_to_vocab(key, lex)
         assert lex != NULL, string
@@ -465,29 +467,37 @@ cdef class Vocab:
             self._by_orth.set(lexeme.orth, lexeme)
             self.length += 1
 
+    def _reset_cache(self, keys, strings):
+        for k in keys:
+            del self._by_hash[k]
+
+        if len(strings) != 0:
+            self._by_orth = PreshMap()
+
 
 def pickle_vocab(vocab):
     sstore = vocab.strings
+    vectors = vocab.vectors
     morph = vocab.morphology
     length = vocab.length
     data_dir = vocab.data_dir
     lex_attr_getters = dill.dumps(vocab.lex_attr_getters)
     lexemes_data = vocab.lexemes_to_bytes()
     return (unpickle_vocab,
-            (sstore, morph, data_dir, lex_attr_getters, lexemes_data, length))
+            (sstore, vectors, morph, data_dir, lex_attr_getters, lexemes_data, length))
 
 
-def unpickle_vocab(sstore, morphology, data_dir,
+def unpickle_vocab(sstore, vectors, morphology, data_dir,
                    lex_attr_getters, bytes lexemes_data, int length):
     cdef Vocab vocab = Vocab()
     vocab.length = length
+    vocab.vectors = vectors
     vocab.strings = sstore
     vocab.morphology = morphology
     vocab.data_dir = data_dir
     vocab.lex_attr_getters = dill.loads(lex_attr_getters)
     vocab.lexemes_from_bytes(lexemes_data)
     vocab.length = length
-    link_vectors_to_models(vocab)
     return vocab
 
 

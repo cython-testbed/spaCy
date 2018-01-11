@@ -4,13 +4,14 @@ from __future__ import unicode_literals, print_function
 import requests
 import pkg_resources
 from pathlib import Path
+import sys
 
 from ..compat import path2str, locale_escape
 from ..util import prints, get_data_path, read_json
 from .. import about
 
 
-def validate(cmd):
+def validate():
     """Validate that the currently installed version of spaCy is compatible
     with the installed models. Should be run after `pip install -U spacy`.
     """
@@ -61,6 +62,9 @@ def validate(cmd):
                "the `python -m spacy link` command with `--force`, or remove "
                "them from the data directory. Data path: {}"
                .format(path2str(get_data_path())))
+
+    if incompat_models or incompat_links:
+        sys.exit(1)
 
 
 def get_model_links(compat):

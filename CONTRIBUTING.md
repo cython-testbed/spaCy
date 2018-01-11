@@ -43,7 +43,7 @@ opening an issue to report the bug, simply refer to your pull request in the
 issue body. A few more tips:
 
 * **Describing your issue:** Try to provide as many details as possible. What
-exactly goes wrong? *How* is is failing? Is there an error?
+exactly goes wrong? *How* is it failing? Is there an error?
 "XY doesn't work" usually isn't that helpful for tracking down problems. Always
 remember to include the code you ran and if possible, extract only the relevant
 parts and don't just dump your entire script. This will make it easier for us to
@@ -57,7 +57,7 @@ even format them as Markdown to copy-paste into GitHub issues:
 * **Checking the model compatibility:** If you're having problems with a
 [statistical model](https://spacy.io/models), it may be because to the
 model is incompatible with your spaCy installation. In spaCy v2.0+, you can check
-this on the command line by running `spacy validate`.
+this on the command line by running `python -m spacy validate`.
 
 * **Sharing a model's output, like dependencies and entities:** spaCy v2.0+
 comes with [built-in visualizers](https://spacy.io/usage/visualizers) that
@@ -88,6 +88,7 @@ requests:
 | [`models`](https://github.com/explosion/spaCy/labels/models), `language / [name]` | Issues related to the specific [models](https://github.com/explosion/spacy-models), languages and data |
 | [`linux`](https://github.com/explosion/spaCy/labels/linux), [`osx`](https://github.com/explosion/spaCy/labels/osx), [`windows`](https://github.com/explosion/spaCy/labels/windows) | Issues related to the specific operating systems |
 | [`pip`](https://github.com/explosion/spaCy/labels/pip), [`conda`](https://github.com/explosion/spaCy/labels/conda) | Issues related to the specific package managers |
+| [`compat`](https://github.com/explosion/spaCy/labels/compat) | Cross-platform and cross-Python compatibility issues |
 | [`wip`](https://github.com/explosion/spaCy/labels/wip) | Work in progress, mostly used for pull requests |
 | [`v1`](https://github.com/explosion/spaCy/labels/v1) | Reports related to spaCy v1.x |
 | [`duplicate`](https://github.com/explosion/spaCy/labels/duplicate) | Duplicates, i.e. issues that have been reported before |
@@ -149,7 +150,7 @@ recipes, that does provide some argument for bringing it "in house".
 
 ### Getting started
 
-To make changes to spaCy's code base, you need to clone the GitHub repository
+To make changes to spaCy's code base, you need to fork then clone the GitHub repository
 and build spaCy from source. You'll need to make sure that you have a
 development environment consisting of a Python distribution including header
 files, a compiler, [pip](https://pip.pypa.io/en/latest/installing/),
