@@ -22,8 +22,8 @@ IDS = {
     "IS_QUOTE": IS_QUOTE,
     "IS_LEFT_PUNCT": IS_LEFT_PUNCT,
     "IS_RIGHT_PUNCT": IS_RIGHT_PUNCT,
+    "IS_CURRENCY": IS_CURRENCY,
 
-    "FLAG18": FLAG18,
     "FLAG19": FLAG19,
     "FLAG20": FLAG20,
     "FLAG21": FLAG21,
@@ -90,6 +90,7 @@ IDS = {
     "SENT_START": SENT_START,
     "SPACY": SPACY,
     "PROB": PROB,
+    "LANG": LANG,
 
     "ADJ": ADJ,
     "ADP": ADP,
@@ -113,8 +114,9 @@ IDS = {
     "SPACE": SPACE,
 
     "Animacy_anim": Animacy_anim,
-    "Animacy_inam": Animacy_inam,
+    "Animacy_inam": Animacy_inan,
     "Animacy_hum": Animacy_hum, # U20
+    "Animacy_nhum": Animacy_nhum,
     "Aspect_freq": Aspect_freq,
     "Aspect_imp": Aspect_imp,
     "Aspect_mod": Aspect_mod,
@@ -457,6 +459,7 @@ IDS = {
     "punct": punct,
     "quantmod": quantmod,
     "rcmod": rcmod,
+    "relcl": relcl,
     "root": root,
     "xcomp": xcomp,
 

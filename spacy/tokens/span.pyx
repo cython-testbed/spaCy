@@ -64,6 +64,11 @@ cdef class Span:
         self._vector_norm = vector_norm
 
     def __richcmp__(self, Span other, int op):
+        if other is None:
+            if op == 0 or op == 1 or op == 2:
+                return False
+            else:
+                return True
         # Eq
         if op == 0:
             return self.start_char < other.start_char
@@ -179,6 +184,15 @@ cdef class Span:
         """
         if 'similarity' in self.doc.user_span_hooks:
             self.doc.user_span_hooks['similarity'](self, other)
+        if len(self) == 1 and hasattr(other, 'orth'):
+            if self[0].orth == other.orth:
+                return 1.0
+        elif hasattr(other, '__len__') and len(self) == len(other):
+            for i in range(len(self)):
+                if self[i].orth != getattr(other[i], 'orth', None):
+                    break
+            else:
+                return 1.0
         if self.vector_norm == 0.0 or other.vector_norm == 0.0:
             return 0.0
         return numpy.dot(self.vector, other.vector) / (self.vector_norm * other.vector_norm)
@@ -261,21 +275,52 @@ cdef class Span:
             self.start = start
             self.end = end + 1
 
+    property vocab:
+        """RETURNS (Vocab): The Span's Doc's vocab."""
+        def __get__(self):
+            return self.doc.vocab
+
     property sent:
         """RETURNS (Span): The sentence span that the span is a part of."""
         def __get__(self):
             if 'sent' in self.doc.user_span_hooks:
                 return self.doc.user_span_hooks['sent'](self)
-            # This should raise if we're not parsed.
+            # This should raise if we're not parsed
+            # or doesen't have any sbd component :)
             self.doc.sents
+            # if doc is parsed we can use the deps to find the sentence
+            # otherwise we use the `sent_start` token attribute
             cdef int n = 0
-            root = &self.doc.c[self.start]
-            while root.head != 0:
-                root += root.head
-                n += 1
-                if n >= self.doc.length:
-                    raise RuntimeError
-            return self.doc[root.l_edge:root.r_edge + 1]
+            cdef int i
+            if self.doc.is_parsed:
+                root = &self.doc.c[self.start]
+                n = 0
+                while root.head != 0:
+                    root += root.head
+                    n += 1
+                    if n >= self.doc.length:
+                        raise RuntimeError
+                return self.doc[root.l_edge:root.r_edge + 1]
+            elif self.doc.is_sentenced:
+                # find start of the sentence
+                start = self.start
+                while self.doc.c[start].sent_start != 1 and start > 0:
+                    start += -1
+                # find end of the sentence
+                end = self.end
+                n = 0
+                while end < self.doc.length and self.doc.c[end].sent_start != 1:
+                    end += 1
+                    n += 1
+                    if n >= self.doc.length:
+                        break
+                #
+                return self.doc[start:end]
+            else:
+                raise ValueError(
+                    "Access to sentence requires either the dependency parse "
+                    "or sentence boundaries to be set by setting " +
+                    "doc[i].is_sent_start = True")
 
     property has_vector:
         """RETURNS (bool): Whether a word vector is associated with the object.

@@ -18,6 +18,7 @@ PACKAGES = find_packages()
 
 
 MOD_NAMES = [
+    'spacy._align',
     'spacy.parts_of_speech',
     'spacy.strings',
     'spacy.lexeme',
@@ -46,9 +47,8 @@ MOD_NAMES = [
 
 COMPILE_OPTIONS =  {
     'msvc': ['/Ox', '/EHsc'],
-    'mingw32' : ['-O3', '-Wno-strict-prototypes', '-Wno-unused-function'],
-    'other' : ['-O3', '-Wno-strict-prototypes', '-Wno-unused-function',
-               '-march=native']
+    'mingw32' : ['-O2', '-Wno-strict-prototypes', '-Wno-unused-function'],
+    'other' : ['-O2', '-Wno-strict-prototypes', '-Wno-unused-function']
 }
 
 
@@ -192,14 +192,13 @@ def setup_package():
                 'preshed>=1.0.0,<2.0.0',
                 'thinc>=6.10.1,<6.11.0',
                 'plac<1.0.0,>=0.9.6',
-                'six',
                 'pathlib',
                 'ujson>=1.35',
                 'dill>=0.2,<0.3',
                 'requests>=2.13.0,<3.0.0',
                 'regex==2017.4.5',
                 'ftfy>=4.4.2,<5.0.0',
-                'msgpack-python',
+                'msgpack-python==0.5.4',
                 'msgpack-numpy==0.4.1'],
             classifiers=[
                 'Development Status :: 5 - Production/Stable',

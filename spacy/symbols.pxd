@@ -17,9 +17,9 @@ cdef enum symbol_t:
     IS_QUOTE
     IS_LEFT_PUNCT
     IS_RIGHT_PUNCT
+    IS_CURRENCY
 
-    FLAG18 = 18
-    FLAG19
+    FLAG19 = 19
     FLAG20
     FLAG21
     FLAG22
@@ -85,6 +85,7 @@ cdef enum symbol_t:
     SENT_START
     SPACY
     PROB
+    LANG
 
     ADJ
     ADP
@@ -108,8 +109,9 @@ cdef enum symbol_t:
     SPACE
 
     Animacy_anim
-    Animacy_inam
+    Animacy_inan
     Animacy_hum # U20
+    Animacy_nhum
     Aspect_freq
     Aspect_imp
     Aspect_mod
@@ -393,6 +395,7 @@ cdef enum symbol_t:
     EVENT
     WORK_OF_ART
     LANGUAGE
+    LAW
 
     DATE
     TIME
@@ -451,9 +454,9 @@ cdef enum symbol_t:
     prt
     punct
     quantmod
+    relcl
     rcmod
     root
     xcomp
 
     acl
-    LAW

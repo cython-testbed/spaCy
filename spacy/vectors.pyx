@@ -151,7 +151,7 @@ cdef class Vectors:
         filled = {row for row in self.key2row.values()}
         self._unset = {row for row in range(shape[0]) if row not in filled}
         removed_items = []
-        for key, row in self.key2row.items():
+        for key, row in list(self.key2row.items()):
             if row >= shape[0]:
                 self.key2row.pop(key)
                 removed_items.append((key, row))
@@ -310,6 +310,8 @@ cdef class Vectors:
             self.data = xp.fromfile(file_, dtype=dtype)
             if dtype != 'float32':
                 self.data = xp.ascontiguousarray(self.data, dtype='float32')
+        if self.data.ndim == 1:
+            self.data = self.data.reshape((self.data.size//width, width))
         n = 0
         strings = StringStore()
         with (path / 'vocab.txt').open('r') as file_:
@@ -345,7 +347,8 @@ cdef class Vectors:
         """
         def load_key2row(path):
             if path.exists():
-                self.key2row = msgpack.load(path.open('rb'))
+                with path.open('rb') as file_:
+                    self.key2row = msgpack.load(file_)
             for key, row in self.key2row.items():
                 if row in self._unset:
                     self._unset.remove(row)

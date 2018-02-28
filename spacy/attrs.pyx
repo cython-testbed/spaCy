@@ -21,7 +21,7 @@ IDS = {
     "IS_QUOTE": IS_QUOTE,
     "IS_LEFT_PUNCT": IS_LEFT_PUNCT,
     "IS_RIGHT_PUNCT": IS_RIGHT_PUNCT,
-    "FLAG18": FLAG18,
+    "IS_CURRENCY": IS_CURRENCY,
     "FLAG19": FLAG19,
     "FLAG20": FLAG20,
     "FLAG21": FLAG21,
@@ -131,7 +131,7 @@ def intify_attrs(stringy_attrs, strings_map=None, _do_deprecated=False):
             'NumValue', 'PartType', 'Polite', 'StyleVariant',
             'PronType', 'AdjType', 'Person', 'Variant', 'AdpType',
             'Reflex', 'Negative', 'Mood', 'Aspect', 'Case',
-            'Polarity', 'Animacy' # U20
+            'Polarity', 'PrepCase', 'Animacy' # U20
         ]
         for key in morph_keys:
             if key in stringy_attrs:

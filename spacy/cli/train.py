@@ -6,18 +6,14 @@ from pathlib import Path
 import tqdm
 from thinc.neural._classes.model import Model
 from timeit import default_timer as timer
-import random
-import numpy.random
 
+from ..attrs import PROB, IS_OOV, CLUSTER, LANG
 from ..gold import GoldCorpus, minibatch
 from ..util import prints
 from .. import util
 from .. import about
 from .. import displacy
 from ..compat import json_dumps
-
-random.seed(0)
-numpy.random.seed(0)
 
 
 @plac.annotations(
@@ -34,17 +30,21 @@ numpy.random.seed(0)
     no_tagger=("Don't train tagger", "flag", "T", bool),
     no_parser=("Don't train parser", "flag", "P", bool),
     no_entities=("Don't train NER", "flag", "N", bool),
+    parser_multitasks=("Side objectives for parser CNN, e.g. dep dep,tag", "option", "pt", str),
+    entity_multitasks=("Side objectives for ner CNN, e.g. dep dep,tag", "option", "et", str),
     gold_preproc=("Use gold preprocessing", "flag", "G", bool),
     version=("Model version", "option", "V", str),
     meta_path=("Optional path to meta.json. All relevant properties will be "
                "overwritten.", "option", "m", Path))
 def train(lang, output_dir, train_data, dev_data, n_iter=30, n_sents=0,
+         parser_multitasks='', entity_multitasks='',
           use_gpu=-1, vectors=None, no_tagger=False,
           no_parser=False, no_entities=False, gold_preproc=False,
           version="0.0.0", meta_path=None):
     """
     Train a model. Expects data in spaCy's JSON format.
     """
+    util.fix_random_seed()
     util.set_env_log(True)
     n_sents = n_sents or None
     output_path = util.ensure_path(output_dir)
@@ -94,8 +94,23 @@ def train(lang, output_dir, train_data, dev_data, n_iter=30, n_sents=0,
     nlp.meta.update(meta)
     if vectors:
         util.load_model(vectors, vocab=nlp.vocab)
+        for lex in nlp.vocab:
+            values = {}
+            for attr, func in nlp.vocab.lex_attr_getters.items():
+                # These attrs are expected to be set by data. Others should
+                # be set by calling the language functions.
+                if attr not in (CLUSTER, PROB, IS_OOV, LANG):
+                    values[lex.vocab.strings[attr]] = func(lex.orth_)
+            lex.set_attrs(**values)
+            lex.is_oov = False
     for name in pipeline:
         nlp.add_pipe(nlp.create_pipe(name), name=name)
+    if parser_multitasks:
+        for objective in parser_multitasks.split(','):
+            nlp.parser.add_multitask_objective(objective)
+    if entity_multitasks:
+        for objective in entity_multitasks.split(','):
+            nlp.entity.add_multitask_objective(objective)
     optimizer = nlp.begin_training(lambda: corpus.train_tuples, device=use_gpu)
     nlp._optimizer = None
 

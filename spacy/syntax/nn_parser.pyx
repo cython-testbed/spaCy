@@ -269,9 +269,6 @@ cdef class Parser:
                 zero_init(Affine(nr_class, hidden_width, drop_factor=0.0))
             )
 
-        # TODO: This is an unfortunate hack atm!
-        # Used to set input dimensions in network.
-        lower.begin_training(lower.ops.allocate((500, token_vector_width)))
         cfg = {
             'nr_class': nr_class,
             'hidden_depth': depth,
@@ -545,6 +542,7 @@ cdef class Parser:
     def update(self, docs, golds, drop=0., sgd=None, losses=None):
         if not any(self.moves.has_gold(gold) for gold in golds):
             return None
+        assert len(docs) == len(golds)
         if self.cfg.get('beam_width', 1) >= 2 and numpy.random.random() >= 0.0:
             return self.update_beam(docs, golds,
                     self.cfg['beam_width'], self.cfg['beam_density'],
@@ -554,8 +552,13 @@ cdef class Parser:
         if isinstance(docs, Doc) and isinstance(golds, GoldParse):
             docs = [docs]
             golds = [golds]
+        for multitask in self._multitasks:
+            multitask.update(docs, golds, drop=drop, sgd=sgd)
         cuda_stream = util.get_cuda_stream()
-        states, golds, max_steps = self._init_gold_batch(docs, golds)
+        # Chop sequences into lengths of this many transitions, to make the
+        # batch uniform length.
+        cut_gold = numpy.random.choice(range(20, 100))
+        states, golds, max_steps = self._init_gold_batch(docs, golds, max_length=cut_gold)
         (tokvecs, bp_tokvecs), state2vec, vec2scores = self.get_batch_model(docs, cuda_stream,
                                                                             drop)
         todo = [(s, g) for (s, g) in zip(states, golds)
@@ -608,7 +611,7 @@ cdef class Parser:
                 break
         self._make_updates(d_tokvecs,
             bp_tokvecs, backprops, sgd, cuda_stream)
-
+    
     def update_beam(self, docs, golds, width=None, density=None,
             drop=0., sgd=None, losses=None):
         if not any(self.moves.has_gold(gold) for gold in golds):
@@ -659,7 +662,7 @@ cdef class Parser:
             _cleanup(beam)
 
 
-    def _init_gold_batch(self, whole_docs, whole_golds):
+    def _init_gold_batch(self, whole_docs, whole_golds, min_length=5, max_length=500):
         """Make a square batch, of length equal to the shortest doc. A long
         doc will get multiple states. Let's say we have a doc of length 2*N,
         where N is the shortest doc. We'll make two states, one representing
@@ -668,7 +671,7 @@ cdef class Parser:
             StateClass state
             Transition action
         whole_states = self.moves.init_batch(whole_docs)
-        max_length = max(5, min(50, min([len(doc) for doc in whole_docs])))
+        max_length = max(min_length, min(max_length, min([len(doc) for doc in whole_docs])))
         max_moves = 0
         states = []
         golds = []
@@ -791,6 +794,11 @@ cdef class Parser:
                     hook(doc)
 
     @property
+    def labels(self):
+        class_names = [self.moves.get_class_name(i) for i in range(self.moves.n_moves)]
+        return class_names
+
+    @property
     def tok2vec(self):
         '''Return the embedding and convolutional layer of the model.'''
         if self.model in (None, True, False):
@@ -825,23 +833,34 @@ cdef class Parser:
         if 'model' in cfg:
             self.model = cfg['model']
         gold_tuples = nonproj.preprocess_training_data(gold_tuples,
-                                                       label_freq_cutoff=100)
+                                                       label_freq_cutoff=30)
         actions = self.moves.get_actions(gold_parses=gold_tuples)
         for action, labels in actions.items():
             for label in labels:
                 self.moves.add_action(action, label)
+        cfg.setdefault('token_vector_width', 128)
         if self.model is True:
             cfg['pretrained_dims'] = self.vocab.vectors_length
             self.model, cfg = self.Model(self.moves.n_moves, **cfg)
             if sgd is None:
                 sgd = self.create_optimizer()
-            self.init_multitask_objectives(gold_tuples, pipeline, sgd=sgd, **cfg)
+            self.model[1].begin_training(
+                    self.model[1].ops.allocate((5, cfg['token_vector_width'])))
+            if pipeline is not None:
+                self.init_multitask_objectives(gold_tuples, pipeline, sgd=sgd, **cfg)
             link_vectors_to_models(self.vocab)
-            self.cfg.update(cfg)
-        elif sgd is None:
-            sgd = self.create_optimizer()
+        else:
+            if sgd is None:
+                sgd = self.create_optimizer()
+            self.model[1].begin_training(
+                self.model[1].ops.allocate((5, cfg['token_vector_width'])))
+        self.cfg.update(cfg)
         return sgd
 
+    def add_multitask_objective(self, target):
+        # Defined in subclasses, to avoid circular import
+        raise NotImplementedError
+    
     def init_multitask_objectives(self, gold_tuples, pipeline, **cfg):
         '''Setup models for secondary objectives, to benefit from multi-task
         learning. This method is intended to be overridden by subclasses.
@@ -880,14 +899,14 @@ cdef class Parser:
         deserializers = {
             'vocab': lambda p: self.vocab.from_disk(p),
             'moves': lambda p: self.moves.from_disk(p, strings=False),
-            'cfg': lambda p: self.cfg.update(ujson.load(p.open())),
+            'cfg': lambda p: self.cfg.update(util.read_json(p)),
             'model': lambda p: None
         }
         util.from_disk(path, deserializers, exclude)
         if 'model' not in exclude:
             path = util.ensure_path(path)
             if self.model is True:
-                self.cfg['pretrained_dims'] = self.vocab.vectors_length
+                self.cfg.setdefault('pretrained_dims', self.vocab.vectors_length)
                 self.model, cfg = self.Model(**self.cfg)
             else:
                 cfg = {}
