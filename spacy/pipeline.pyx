@@ -69,6 +69,34 @@ class SentenceSegmenter(object):
             yield doc[start:len(doc)]
 
 
+def merge_noun_chunks(doc):
+    """Merge noun chunks into a single token.
+
+    doc (Doc): The Doc object.
+    RETURNS (Doc): The Doc object with merged noun chunks.
+    """
+    if not doc.is_parsed:
+        return
+    spans = [(np.start_char, np.end_char, np.root.tag, np.root.dep)
+             for np in doc.noun_chunks]
+    for start, end, tag, dep in spans:
+        doc.merge(start, end, tag=tag, dep=dep)
+    return doc
+
+
+def merge_entities(doc):
+    """Merge entities into a single token.
+
+    doc (Doc): The Doc object.
+    RETURNS (Doc): The Doc object with merged noun entities.
+    """
+    spans = [(e.start_char, e.end_char, e.root.tag, e.root.dep, e.label)
+             for e in doc.ents]
+    for start, end, tag, dep, ent_type in spans:
+        doc.merge(start, end, tag=tag, dep=dep, ent_type=ent_type)
+    return doc
+
+
 class Pipe(object):
     """This class is not instantiated directly. Components inherit from it, and
     it defines the interface that components should follow to function as
@@ -139,7 +167,7 @@ class Pipe(object):
         problem.
         """
         raise NotImplementedError
-    
+
     def create_optimizer(self):
         return create_default_optimizer(self.model.ops,
                                         **self.cfg.get('optimizer', {}))
@@ -838,8 +866,8 @@ class TextCategorizer(Pipe):
     name = 'textcat'
 
     @classmethod
-    def Model(cls, nr_class=1, width=64, **cfg):
-        return build_text_classifier(nr_class, width, **cfg)
+    def Model(cls, **cfg):
+        return build_text_classifier(**cfg)
 
     def __init__(self, vocab, model=True, **cfg):
         self.vocab = vocab
@@ -905,6 +933,15 @@ class TextCategorizer(Pipe):
         if label in self.labels:
             return 0
         if self.model not in (None, True, False):
+            # This functionality was available previously, but was broken.
+            # The problem is that we resize the last layer, but the last layer
+            # is actually just an ensemble. We're not resizing the child layers
+            # -- a huge problem.
+            raise ValueError(
+                "Cannot currently add labels to pre-trained text classifier. "
+                "Add labels before training begins. This functionality was "
+                "available in previous versions, but had significant bugs that "
+                "let to poor performance")
             smaller = self.model._layers[-1]
             larger = Affine(len(self.labels)+1, smaller.nI)
             copy_array(larger.W[:smaller.nO], smaller.W)
@@ -920,8 +957,9 @@ class TextCategorizer(Pipe):
             token_vector_width = 64
         if self.model is True:
             self.cfg['pretrained_dims'] = self.vocab.vectors_length
-            self.model = self.Model(len(self.labels), token_vector_width,
-                                    **self.cfg)
+            self.cfg['nr_class'] = len(self.labels)
+            self.cfg['width'] = token_vector_width
+            self.model = self.Model(**self.cfg)
             link_vectors_to_models(self.vocab)
         if sgd is None:
             sgd = self.create_optimizer()
@@ -935,7 +973,7 @@ cdef class DependencyParser(Parser):
     @property
     def postprocesses(self):
         return [nonproj.deprojectivize]
-    
+
     def add_multitask_objective(self, target):
         labeller = MultitaskObjective(self.vocab, target=target)
         self._multitasks.append(labeller)
@@ -956,7 +994,7 @@ cdef class EntityRecognizer(Parser):
     TransitionSystem = BiluoPushDown
 
     nr_feature = 6
-    
+
     def add_multitask_objective(self, target):
         labeller = MultitaskObjective(self.vocab, target=target)
         self._multitasks.append(labeller)
