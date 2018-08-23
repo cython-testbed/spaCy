@@ -14,12 +14,16 @@ from .. import util
 # These languages are used for generic tokenizer tests – only add a language
 # here if it's using spaCy's tokenizer (not a different library)
 # TODO: re-implement generic tokenizer tests
-_languages = ['bn', 'da', 'de', 'en', 'es', 'fi', 'fr', 'ga', 'he', 'hu', 'id',
-              'it', 'nb', 'nl', 'pl', 'pt', 'ru', 'sv', 'tr', 'xx']
+_languages = ['bn', 'da', 'de', 'el', 'en', 'es', 'fi', 'fr', 'ga', 'he', 'hu', 'id',
+              'it', 'nb', 'nl', 'pl', 'pt', 'ro', 'ru', 'sv', 'tr', 'ar', 'ut', 'tt',
+              'xx']
+
 _models = {'en': ['en_core_web_sm'],
-           'de': ['de_core_news_md'],
+           'de': ['de_core_news_sm'],
            'fr': ['fr_core_news_sm'],
-           'xx': ['xx_ent_web_md']}
+           'xx': ['xx_ent_web_sm'],
+           'en_core_web_md': ['en_core_web_md'],
+           'es_core_news_md': ['es_core_news_md']}
 
 
 # only used for tests that require loading the models
@@ -45,11 +49,16 @@ def RU(request):
     pymorphy = pytest.importorskip('pymorphy2')
     return util.get_lang_class('ru')()
 
+@pytest.fixture()
+def JA(request):
+    mecab = pytest.importorskip("MeCab")
+    return util.get_lang_class('ja')()
+
 
 #@pytest.fixture(params=_languages)
 #def tokenizer(request):
-    #lang = util.get_lang_class(request.param)
-    #return lang.Defaults.create_tokenizer()
+#lang = util.get_lang_class(request.param)
+#return lang.Defaults.create_tokenizer()
 
 
 @pytest.fixture
@@ -57,7 +66,7 @@ def tokenizer():
     return util.get_lang_class('xx').Defaults.create_tokenizer()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def en_tokenizer():
     return util.get_lang_class('en').Defaults.create_tokenizer()
 
@@ -73,81 +82,95 @@ def en_parser(en_vocab):
     return nlp.create_pipe('parser')
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def es_tokenizer():
     return util.get_lang_class('es').Defaults.create_tokenizer()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def de_tokenizer():
     return util.get_lang_class('de').Defaults.create_tokenizer()
 
 
-@pytest.fixture
-def fr_tokenizer():
-    return util.get_lang_class('fr').Defaults.create_tokenizer()
-
-
-@pytest.fixture
+@pytest.fixture(scope='session')
 def hu_tokenizer():
     return util.get_lang_class('hu').Defaults.create_tokenizer()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def fi_tokenizer():
     return util.get_lang_class('fi').Defaults.create_tokenizer()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
+def ro_tokenizer():
+    return util.get_lang_class('ro').Defaults.create_tokenizer()
+
+
+@pytest.fixture(scope='session')
 def id_tokenizer():
     return util.get_lang_class('id').Defaults.create_tokenizer()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def sv_tokenizer():
     return util.get_lang_class('sv').Defaults.create_tokenizer()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def bn_tokenizer():
     return util.get_lang_class('bn').Defaults.create_tokenizer()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def ga_tokenizer():
     return util.get_lang_class('ga').Defaults.create_tokenizer()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def he_tokenizer():
     return util.get_lang_class('he').Defaults.create_tokenizer()
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def nb_tokenizer():
     return util.get_lang_class('nb').Defaults.create_tokenizer()
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def da_tokenizer():
     return util.get_lang_class('da').Defaults.create_tokenizer()
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def ja_tokenizer():
-    janome = pytest.importorskip("janome")
+    mecab = pytest.importorskip("MeCab")
     return util.get_lang_class('ja').Defaults.create_tokenizer()
 
-
-@pytest.fixture
+@pytest.fixture(scope='session')
 def th_tokenizer():
     pythainlp = pytest.importorskip("pythainlp")
     return util.get_lang_class('th').Defaults.create_tokenizer()
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def tr_tokenizer():
     return util.get_lang_class('tr').Defaults.create_tokenizer()
 
+@pytest.fixture(scope='session')
+def tt_tokenizer():
+    return util.get_lang_class('tt').Defaults.create_tokenizer()
 
-@pytest.fixture
+@pytest.fixture(scope='session')
+def el_tokenizer():
+    return util.get_lang_class('el').Defaults.create_tokenizer()
+
+@pytest.fixture(scope='session')
+def ar_tokenizer():
+    return util.get_lang_class('ar').Defaults.create_tokenizer()
+
+@pytest.fixture(scope='session')
+def ur_tokenizer():
+    return util.get_lang_class('ur').Defaults.create_tokenizer()
+
+@pytest.fixture(scope='session')
 def ru_tokenizer():
     pymorphy = pytest.importorskip('pymorphy2')
     return util.get_lang_class('ru').Defaults.create_tokenizer()
@@ -160,7 +183,7 @@ def stringstore():
 
 @pytest.fixture
 def en_entityrecognizer():
-     return util.get_lang_class('en').Defaults.create_entity()
+    return util.get_lang_class('en').Defaults.create_entity()
 
 
 @pytest.fixture
@@ -175,14 +198,17 @@ def text_file_b():
 
 def pytest_addoption(parser):
     parser.addoption("--models", action="store_true",
-        help="include tests that require full models")
+                     help="include tests that require full models")
     parser.addoption("--vectors", action="store_true",
-        help="include word vectors tests")
+                     help="include word vectors tests")
     parser.addoption("--slow", action="store_true",
-        help="include slow tests")
+                     help="include slow tests")
 
     for lang in _languages + ['all']:
         parser.addoption("--%s" % lang, action="store_true", help="Use %s models" % lang)
+    for model in _models:
+        if model not in _languages:
+            parser.addoption("--%s" % model, action="store_true", help="Use %s model" % model)
 
 
 def pytest_runtest_setup(item):

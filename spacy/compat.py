@@ -1,7 +1,6 @@
 # coding: utf8
 from __future__ import unicode_literals
 
-import ftfy
 import sys
 import ujson
 import itertools
@@ -38,7 +37,6 @@ pickle = pickle
 copy_reg = copy_reg
 CudaStream = CudaStream
 cupy = cupy
-fix_text = ftfy.fix_text
 copy_array = copy_array
 izip = getattr(itertools, 'izip', zip)
 
@@ -90,11 +88,11 @@ def symlink_to(orig, dest):
 
 
 def is_config(python2=None, python3=None, windows=None, linux=None, osx=None):
-    return ((python2 is None or python2 == is_python2) and
-            (python3 is None or python3 == is_python3) and
-            (windows is None or windows == is_windows) and
-            (linux is None or linux == is_linux) and
-            (osx is None or osx == is_osx))
+    return (python2 in (None, is_python2) and
+            python3 in (None, is_python3) and
+            windows in (None, is_windows) and
+            linux in (None, is_linux) and
+            osx in (None, is_osx))
 
 
 def normalize_string_keys(old):

@@ -23,6 +23,7 @@ from thinc.neural._classes.affine import _set_dimensions_if_needed
 import thinc.extra.load_nlp
 
 from .attrs import ID, ORTH, LOWER, NORM, PREFIX, SUFFIX, SHAPE
+from .errors import Errors
 from . import util
 
 
@@ -62,6 +63,23 @@ def _flatten_add_lengths(seqs, pad=0, drop=0.):
 
     X = ops.flatten(seqs, pad=pad)
     return (X, lengths), finish_update
+
+
+@layerize
+def _logistic(X, drop=0.):
+    xp = get_array_module(X)
+    if not isinstance(X, xp.ndarray):
+        X = xp.asarray(X)
+    # Clip to range (-10, 10)
+    X = xp.minimum(X, 10., X)
+    X = xp.maximum(X, -10., X)
+    Y = 1. / (1. + xp.exp(-X))
+
+    def logistic_bwd(dY, sgd=None):
+        dX = dY * (Y * (1-Y))
+        return dX
+
+    return Y, logistic_bwd
 
 
 def _zero_init(model):
@@ -127,8 +145,8 @@ class PrecomputableAffine(Model):
         self.nF = nF
 
     def begin_update(self, X, drop=0.):
-        Yf = self.ops.gemm(X,
-            self.W.reshape((self.nF*self.nO*self.nP, self.nI)), trans2=True)
+        Yf = self.ops.xp.dot(X,
+            self.W.reshape((self.nF*self.nO*self.nP, self.nI)).T)
         Yf = Yf.reshape((Yf.shape[0], self.nF, self.nO, self.nP))
         Yf = self._add_padding(Yf)
 
@@ -144,11 +162,11 @@ class PrecomputableAffine(Model):
             Wopfi = self.W.transpose((1, 2, 0, 3))
             Wopfi = self.ops.xp.ascontiguousarray(Wopfi)
             Wopfi = Wopfi.reshape((self.nO*self.nP, self.nF * self.nI))
-            dXf = self.ops.gemm(dY.reshape((dY.shape[0], self.nO*self.nP)), Wopfi)
+            dXf = self.ops.dot(dY.reshape((dY.shape[0], self.nO*self.nP)), Wopfi)
 
             # Reuse the buffer
             dWopfi = Wopfi; dWopfi.fill(0.)
-            self.ops.gemm(dY, Xf, out=dWopfi, trans1=True)
+            self.ops.xp.dot(dY.T, Xf, out=dWopfi)
             dWopfi = dWopfi.reshape((self.nO, self.nP, self.nF, self.nI))
             # (o, p, f, i) --> (f, o, p, i)
             self.d_W += dWopfi.transpose((2, 0, 1, 3))
@@ -157,7 +175,7 @@ class PrecomputableAffine(Model):
                 sgd(self._mem.weights, self._mem.gradient, key=self.id)
             return dXf.reshape((dXf.shape[0], self.nF, self.nI))
         return Yf, backward
-    
+
     def _add_padding(self, Yf):
         Yf_padded = self.ops.xp.vstack((self.pad, Yf))
         return Yf_padded
@@ -225,6 +243,11 @@ class PrecomputableAffine(Model):
 
 def link_vectors_to_models(vocab):
     vectors = vocab.vectors
+    if vectors.name is None:
+        vectors.name = VECTORS_KEY
+        print(
+            "Warning: Unnamed vectors -- this won't allow multiple vectors "
+            "models to be loaded. (Shape: (%d, %d))" % vectors.data.shape)
     ops = Model.ops
     for word in vocab:
         if word.orth in vectors.key2row:
@@ -234,11 +257,11 @@ def link_vectors_to_models(vocab):
     data = ops.asarray(vectors.data)
     # Set an entry here, so that vectors are accessed by StaticVectors
     # (unideal, I know)
-    thinc.extra.load_nlp.VECTORS[(ops.device, VECTORS_KEY)] = data
+    thinc.extra.load_nlp.VECTORS[(ops.device, vectors.name)] = data
 
 
 def Tok2Vec(width, embed_size, **kwargs):
-    pretrained_dims = kwargs.get('pretrained_dims', 0)
+    pretrained_vectors = kwargs.get('pretrained_vectors', None)
     cnn_maxout_pieces = kwargs.get('cnn_maxout_pieces', 2)
     cols = [ID, NORM, PREFIX, SUFFIX, SHAPE, ORTH]
     with Model.define_operators({'>>': chain, '|': concatenate, '**': clone,
@@ -251,16 +274,16 @@ def Tok2Vec(width, embed_size, **kwargs):
                            name='embed_suffix')
         shape = HashEmbed(width, embed_size//2, column=cols.index(SHAPE),
                           name='embed_shape')
-        if pretrained_dims is not None and pretrained_dims >= 1:
-            glove = StaticVectors(VECTORS_KEY, width, column=cols.index(ID))
+        if pretrained_vectors is not None:
+            glove = StaticVectors(pretrained_vectors, width, column=cols.index(ID))
 
             embed = uniqued(
                 (glove | norm | prefix | suffix | shape)
-                >> LN(Maxout(width, width*5, pieces=3)), column=5)
+                >> LN(Maxout(width, width*5, pieces=3)), column=cols.index(ORTH))
         else:
             embed = uniqued(
                 (norm | prefix | suffix | shape)
-                >> LN(Maxout(width, width*4, pieces=3)), column=5)
+                >> LN(Maxout(width, width*4, pieces=3)), column=cols.index(ORTH))
 
         convolution = Residual(
             ExtractWindow(nW=1)
@@ -318,10 +341,10 @@ def _divide_array(X, size):
 
 
 def get_col(idx):
-    assert idx >= 0, idx
+    if idx < 0:
+        raise IndexError(Errors.E066.format(value=idx))
 
     def forward(X, drop=0.):
-        assert idx >= 0, idx
         if isinstance(X, numpy.ndarray):
             ops = NumpyOps()
         else:
@@ -329,7 +352,6 @@ def get_col(idx):
         output = ops.xp.ascontiguousarray(X[:, idx], dtype=X.dtype)
 
         def backward(y, sgd=None):
-            assert idx >= 0, idx
             dX = ops.allocate(X.shape)
             dX[:, idx] += y
             return dX
@@ -416,13 +438,13 @@ def build_tagger_model(nr_class, **cfg):
         token_vector_width = cfg['token_vector_width']
     else:
         token_vector_width = util.env_opt('token_vector_width', 128)
-    pretrained_dims = cfg.get('pretrained_dims', 0)
+    pretrained_vectors = cfg.get('pretrained_vectors')
     with Model.define_operators({'>>': chain, '+': add}):
         if 'tok2vec' in cfg:
             tok2vec = cfg['tok2vec']
         else:
             tok2vec = Tok2Vec(token_vector_width, embed_size,
-                              pretrained_dims=pretrained_dims)
+                              pretrained_vectors=pretrained_vectors)
         softmax = with_flatten(Softmax(nr_class, token_vector_width))
         model = (
             tok2vec
@@ -450,7 +472,6 @@ def SpacyVectors(docs, drop=0.):
 
 
 def build_text_classifier(nr_class, width=64, **cfg):
-    depth = cfg.get('depth', 2)
     nr_vector = cfg.get('nr_vector', 5000)
     pretrained_dims = cfg.get('pretrained_dims', 0)
     with Model.define_operators({'>>': chain, '+': add, '|': concatenate,
@@ -502,7 +523,7 @@ def build_text_classifier(nr_class, width=64, **cfg):
                 LN(Maxout(width, vectors_width))
                 >> Residual(
                     (ExtractWindow(nW=1) >> LN(Maxout(width, width*3)))
-                ) ** depth, pad=depth
+                ) ** 2, pad=2
             )
             >> flatten_add_lengths
             >> ParametricAttention(width)
@@ -515,6 +536,8 @@ def build_text_classifier(nr_class, width=64, **cfg):
             _preprocess_doc
             >> LinearModel(nr_class)
         )
+        #model = linear_model >> logistic
+
         model = (
             (linear_model | cnn_model)
             >> zero_init(Affine(nr_class, nr_class*2, drop_factor=0.0))
