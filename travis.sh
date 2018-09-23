@@ -17,7 +17,7 @@ fi
 
 if [ "${VIA}" == "compile" ]; then
   pip install -r requirements.txt
-  pip install --install-option="--no-cython-compile" https://github.com/cython/cython/archive/7b4079c50d88f5ce1cf3cc55a6f46cd6e35cbda4.zip
+  pip install --install-option="--no-cython-compile" https://github.com/cython/cython/archive/b6509bf791bfe44abbbaa957ae530e5910815dfd.zip
   python setup.py build_ext --inplace
   pip install -e .
 fi
