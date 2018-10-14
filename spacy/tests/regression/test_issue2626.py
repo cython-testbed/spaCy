@@ -1,4 +1,5 @@
 from __future__ import unicode_literals
+import pytest
 import spacy
 
 def test_issue2626():

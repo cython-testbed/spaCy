@@ -185,17 +185,18 @@ def setup_package():
             license=about['__license__'],
             ext_modules=ext_modules,
             scripts=['bin/spacy'],
+            setup_requires=['wheel>=0.32.0,<0.33.0'],
             install_requires=[
                 'numpy>=1.15.0',
                 'msgpack-numpy<0.4.4.0'
-                'murmurhash>=0.28,<0.29',
+                'murmurhash>=0.28.0,<1.1.0',
                 'cymem>=1.30,<1.32',
                 'preshed>=1.0.0,<2.0.0',
                 'thinc>=6.10.3,<6.11.0',
                 'plac<1.0.0,>=0.9.6',
                 'ujson>=1.35',
                 'dill>=0.2,<0.3',
-                'regex==2017.4.5',
+                'regex==2018.01.10',
                 'requests>=2.13.0,<3.0.0',
                 'pathlib==1.0.1; python_version < "3.4"'],
             classifiers=[
